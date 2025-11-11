@@ -43,9 +43,14 @@ rclone 管理保险库有多种方式，本GUI仅使用它的 crypt存储格式�
 
     * 随发布的主程序res目录下附带rclone.exe ， 或者手动下载后存放到主程序文件的res目录下，并确保文件名为`rclone.exe` 。
     * 配置文件会自动创建，或手动编辑后确保配置文件名为`rclone.conf` ，存放在res目录下。
-
   * 需要注意的是，rclone 的挂载功能依赖于 FUSE，所以在 Windwos 上挂载需要先安装 [winfsp](https://github.com/billziss-gh/winfsp/releases) 。
 
+# 运行图
+
+<div align="center"> 
+    <img src="imgs/screenshot_tab1.jpg" width="45%" /> 
+    <img src="imgs/screenshot_tab2.jpg" width="45%" /> 
+</div>
 # 致谢
 
 项目启发自 [RcloneVault](https://github.com/HaujetZhao/RcloneVault)
