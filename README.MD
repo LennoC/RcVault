@@ -51,6 +51,8 @@ rclone 管理保险库有多种方式，本GUI仅使用它的 crypt存储格式�
     <img src="imgs/screenshot_tab1.jpg" width="45%" /> 
     <img src="imgs/screenshot_tab2.jpg" width="45%" /> 
 </div>
+
+
 # 致谢
 
 项目启发自 [RcloneVault](https://github.com/HaujetZhao/RcloneVault)
