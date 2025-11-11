@@ -1,0 +1,199 @@
+import win.ui;
+import process;
+import process.popen;
+import string;
+import fsys.ini;
+import fsys;
+/*DSG{{*/
+var frmTab1 = win.form(text="挂载";right=399;bottom=499;max=false)
+frmTab1.add(
+btn_mount={cls="button";text="挂载";left=240;top=64;right=312;bottom=104;dl=1;dt=1;font=LOGFONT(h=-21);z=1};
+btn_netMount={cls="button";text="映射";left=240;top=208;right=312;bottom=248;dl=1;dt=1;font=LOGFONT(h=-21);z=15};
+btn_openMountPath={cls="button";text="打开";left=320;top=64;right=392;bottom=104;disabled=1;dl=1;dt=1;font=LOGFONT(h=-21);z=20};
+btn_showPwd={cls="button";text="显";left=232;top=296;right=256;bottom=320;dl=1;dt=1;z=19};
+cbb_driveList={cls="combobox";left=152;top=80;right=194;bottom=106;border=1;edge=1;font=LOGFONT(h=-16);items={"H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"};mode="dropdown";z=3};
+cbb_sections={cls="combobox";left=152;top=16;right=312;bottom=42;db=1;dl=1;dr=1;dt=1;edge=1;font=LOGFONT(h=-24);items={};mode="dropdownlist";z=18};
+cbb_serverPort={cls="combobox";left=120;top=216;right=224;bottom=242;dt=1;edge=1;font=LOGFONT(h=-16);items={"9990","12222"};mode="dropdown";z=10};
+cbb_serverType={cls="combobox";left=120;top=176;right=224;bottom=202;dt=1;edge=1;font=LOGFONT(h=-16);items={"webdav","ftp","sftp","http"};mode="dropdownlist";z=8};
+edt_LogShow={cls="edit";left=16;top=384;right=384;bottom=488;edge=1;hscroll=1;multiline=1;readonly=1;vscroll=1;z=17};
+edt_serverPwd={cls="edit";left=120;top=296;right=224;bottom=322;dt=1;edge=1;font=LOGFONT(h=-16);password=1;z=14};
+edt_serverUser={cls="edit";left=120;top=256;right=224;bottom=282;dt=1;edge=1;font=LOGFONT(h=-16);multiline=1;z=13};
+groupbox={cls="groupbox";text="网络映射到：";left=8;top=136;right=392;bottom=344;edge=1;font=LOGFONT(h=-21);z=6};
+groupbox3={cls="groupbox";text="执行结果/Logs";left=8;top=352;right=392;bottom=496;edge=1;font=LOGFONT(h=-21);z=16};
+static={cls="static";text="本地挂载到：";left=16;top=80;right=152;bottom=112;font=LOGFONT(h=-21);notify=1;transparent=1;z=2};
+static2={cls="static";text="盘";left=208;top=80;right=240;bottom=112;aw=1;font=LOGFONT(h=-21);transparent=1;z=4};
+static3={cls="static";text="当前操作库：";left=16;top=24;right=152;bottom=56;dl=1;dt=1;font=LOGFONT(h=-21);notify=1;transparent=1;z=5};
+static4={cls="static";text="映射模式：";left=24;top=176;right=128;bottom=208;dl=1;dt=1;font=LOGFONT(h=-19);transparent=1;z=7};
+static5={cls="static";text="端口：";left=24;top=216;right=128;bottom=248;dl=1;dt=1;font=LOGFONT(h=-19);transparent=1;z=9};
+static6={cls="static";text="密码：";left=24;top=296;right=128;bottom=328;dl=1;dt=1;font=LOGFONT(h=-19);transparent=1;z=11};
+static7={cls="static";text="用户名：";left=24;top=256;right=128;bottom=288;dl=1;dt=1;font=LOGFONT(h=-19);transparent=1;z=12}
+)
+/*}}*/
+
+var rclone_Path = "\res\rclone.exe"
+var isMounted = 0 //是否挂载
+var isNetMounted = 0; //是否网络映射
+// var vaultName = "localcrypt"
+
+var cfgPath = "\res\rclone.conf";
+var rcCfg = fsys.ini(cfgPath);
+var secNames = rcCfg.getSectionNames();
+
+if(frmTab1.cbb_sections.count==0){
+frmTab1.cbb_sections.addItems(secNames);
+frmTab1.cbb_sections.selIndex = 1;
+}
+
+var vaultName = frmTab1.cbb_sections.selText;
+
+// 本地挂载的按钮
+frmTab1.btn_mount.oncommand = function(id,event){
+	vaultName = frmTab1.cbb_sections.selText;
+	var ds = frmTab1.cbb_driveList.text;
+	var ds_cmd = ds + ":";
+	if(isMounted==0 and fsys.path.isDir(ds_cmd)){
+		frmTab1.msgboxErr("已存在该分区，请更换其他分区");
+		return ; }
+	if(isMounted==0){
+		vaultName_Mounted = vaultName;
+		var vaultName_cmd = vaultName + ":";
+		var t1 = "将库 " ++ vaultName ++ " 挂载在" ++ ds ++ "盘";
+		prcs_cmd = process.joinArguments(rclone_Path,"mount",vaultName_cmd,ds_cmd,"--vfs-cache-mode","full","--dir-cache-time","60s"); // dir-cache-time defualt 5min
+		prcs = process.popen(rclone_Path,"mount",vaultName_cmd,ds_cmd,"--vfs-cache-mode","full","--dir-cache-time","60s");
+		TextLog("程序执行命令为： "+prcs_cmd);
+		TextLog(t1);
+		prcs.logResponse(frmTab1.edt_LogShow);
+		frmTab1.btn_mount.text = "停止";
+		for(i=1;3;1){
+			thread.delay(500);
+			if(fsys.path.isDir(ds_cmd)){
+				//frmTab1.cbb_sections.disabled = true;
+				frmTab1.cbb_driveList.disabled = true;
+				frmTab1.btn_openMountPath.disabled = false;
+				isMounted = 1;
+				break;
+			}
+		}
+
+	}
+	elseif(isMounted==1){
+		try{
+			if(prcs){
+			prcs.terminate(); }
+		}
+		frmTab1.btn_mount.text = "挂载";
+		//frmTab1.cbb_sections.disabled = false;
+		frmTab1.cbb_driveList.disabled = false;
+		frmTab1.btn_openMountPath.disabled = true;
+		isMounted = 0;	
+		TextLog("已停止库 " ++ vaultName_Mounted ++ " 的本地挂载");	
+	}
+}
+
+// 网络映射的按钮
+frmTab1.btn_netMount.oncommand = function(id,event){
+	vaultName = frmTab1.cbb_sections.selText;
+	var vaultName_cmd = vaultName + ":";
+	var nm_serverType = frmTab1.cbb_serverType.selText;
+	var nm_serverPort = frmTab1.cbb_serverPort.selText;
+	var nm_serverUser = frmTab1.edt_serverUser.text;
+	var nm_serverPwd = frmTab1.edt_serverPwd.text;
+	var t1 = "将库 " ++ vaultName ++ " 通过 " ++  nm_serverType ++ " 方式映射在 0.0.0.0:" ++ nm_serverPort;
+	var t2;
+	if(nm_serverPwd !="" and nm_serverUser ==""){
+		frmTab1.msgboxErr("若设置了密码，需要同时设置用户名" ++ '\r\n' ++ "或将密码清空","密码无效");
+		return ; 	
+	}
+	if(nm_serverUser!=""){
+		t2 = "用户名user: " ++ nm_serverUser ++ "  密码pwd: " ++ nm_serverPwd;	
+	}
+	else{
+		t2 = "无用户名和密码;使用匿名登录";
+	}
+	var t3 = "通过支持协议 " ++ nm_serverType ++ " 的浏览器或管理器访问 127.0.0.1:" ++ nm_serverPort ++ " 以查看映射后的加密库";
+	if(isNetMounted == 1){
+		try{
+			if(netPrcs){
+				netPrcs.terminate();
+			}
+		}
+		isNetMounted = 0;
+		frmTab1.btn_netMount.text = "映射";
+		frmTab1.cbb_serverType.disabled = false;
+		frmTab1.cbb_serverPort.disabled = false;
+		frmTab1.edt_serverUser.readonly = false;
+		frmTab1.edt_serverPwd.readonly = false;
+		TextLog("已停止库 " ++ vaultName_NetMounted ++ " 的网络映射");	
+			
+	}
+	elseif(isNetMounted == 0){
+		if(nm_serverUser==""){
+			netPrcs_cmd = process.joinArguments(rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort);
+			netPrcs,netPrcsErr = process.popen(rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort);
+		}
+		else{
+			netPrcs_cmd = process.joinArguments(rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort,"--user",nm_serverUser,"--pass",nm_serverPwd);
+			netPrcs,netPrcsErr = process.popen(rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort,"--user",nm_serverUser,"--pass",nm_serverPwd);
+		}
+		if(!netPrcs) { 
+			return winform.msgboxErr(netPrcsErr); 
+		}
+		else{
+			TextLog("程序执行命令为： "+netPrcs_cmd);
+			isNetMounted = 1;
+			vaultName_NetMounted = vaultName;
+			frmTab1.btn_netMount.text = "停止";
+			frmTab1.cbb_serverType.disabled = true;
+			frmTab1.cbb_serverPort.disabled = true;
+			frmTab1.edt_serverUser.readonly = true;
+			frmTab1.edt_serverPwd.readonly = true;
+			TextLog(t1);
+			TextLog(t2);
+			TextLog(t3);
+			netPrcs.logResponse(frmTab1.edt_LogShow);
+			netPrcs.killOnExit();
+		}
+	}
+}
+
+TextLog = function(text){
+	frmTab1.edt_LogShow.appendText(NowTime() + tostring(text) + '\r\n');
+}
+
+NowTime = function(){
+	var tm = tostring(time()) + " ";
+	return tm;
+}
+
+frmTab1.onClose = function(hwnd,message,wParam,lParam){
+	try{
+		if(netPrcs){
+			netPrcs.terminate();
+		}
+		if(prcs){
+			prcs.terminate();
+		}
+	}
+}
+
+frmTab1.btn_showPwd.oncommand = function(id,event){
+	if(frmTab1.edt_serverPwd.passwordChar){
+	frmTab1.edt_serverPwd.passwordChar = null;
+	frmTab1.btn_showPwd.text = "隐";
+	}
+	else{
+	frmTab1.edt_serverPwd.passwordChar = "*";
+	frmTab1.btn_showPwd.text = "显";	
+	}
+}
+
+frmTab1.btn_openMountPath.oncommand = function(id,event){
+	var ds = frmTab1.cbb_driveList.selText ++ ":";
+	process.execute("explorer", ds);  
+}
+
+
+
+frmTab1.show();
+win.loopMessage();
+return frmTab1;

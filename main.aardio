@@ -1,0 +1,39 @@
+import win.ui;
+/*DSG{{*/
+mainForm = win.form(text="RcVault";right=439;bottom=539;max=false)
+mainForm.add(
+tab={cls="tab";left=14;top=16;right=418;bottom=524;db=1;dl=1;dr=1;dt=1;z=1}
+)
+/*}}*/
+
+var frmTab1 = mainForm.tab.loadForm("\dlg\tab1.aardio");
+var frmTab2 = mainForm.tab.loadForm("\dlg\tab2.aardio");
+
+var rclone_Path = "\res\rclone.exe";
+var rcConfig_Path = "\res\rclone.conf";
+var lastActiveTab = 1; //记录上次激活的tab
+
+var Init = function(){
+	if(!io.exist(rclone_Path)){
+		mainForm.msgboxErr("rclone.exe程序不存在，请手动下载放到res目录下","核心程序不存在");
+		return ; 
+	}
+	if(!io.exist(rcConfig_Path)){
+		var prcs = process.popen(rclone_Path,"config","touch"); //确保rclone配置文件存在，不存在会新建空文件
+	}
+}
+
+mainForm.tab.onSelChange = function(index){
+	if(index == 2 && lastActiveTab != 2){
+        ReadConfig(frmTab2.cbb_sections.selText);
+    }
+    lastActiveTab = index;
+}
+
+frmTab1.cbb_sections.onSelChange = function(){
+	frmTab2.cbb_sections.selText = frmTab1.cbb_sections.selText;
+}
+
+Init();
+mainForm.show();
+win.loopMessage();
