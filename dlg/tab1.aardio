@@ -31,17 +31,16 @@ static7={cls="static";text="用户名：";left=24;top=256;right=128;bottom=288;d
 /*}}*/
 
 var rclone_Path = "\res\rclone.exe"
-var isMounted = 0 //是否挂载
-var isNetMounted = 0; //是否网络映射
-// var vaultName = "localcrypt"
-
 var cfgPath = "\res\rclone.conf";
 var rcCfg = fsys.ini(cfgPath);
-var secNames = rcCfg.getSectionNames();
+var sectionNames = rcCfg.getSectionNames();
+
+var isMounted = 0 //是否挂载
+var isNetMounted = 0; //是否网络映射
 
 if(frmTab1.cbb_sections.count==0){
-frmTab1.cbb_sections.addItems(secNames);
-frmTab1.cbb_sections.selIndex = 1;
+	frmTab1.cbb_sections.addItems(sectionNames);
+	frmTab1.cbb_sections.selIndex = 1;
 }
 
 var vaultName = frmTab1.cbb_sections.selText;

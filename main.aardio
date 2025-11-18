@@ -8,9 +8,15 @@ tab={cls="tab";left=14;top=16;right=418;bottom=524;db=1;dl=1;dr=1;dt=1;z=1}
 
 var frmTab1 = mainForm.tab.loadForm("\dlg\tab1.aardio");
 var frmTab2 = mainForm.tab.loadForm("\dlg\tab2.aardio");
+var frmTab3 = mainForm.tab.loadForm("\dlg\tab3.aardio");
 
 var rclone_Path = "\res\rclone.exe";
 var rcConfig_Path = "\res\rclone.conf";
+//var rcConfig_FullPath = io.fullpath(rcConfig_Path); //配置文件的绝对路径
+var rcCfg = fsys.ini(rcConfig_Path); //设置配置文件的对象
+var sectionNames = rcCfg.getSectionNames(); // 获取所有小节名字,返回字符串数组
+
+var isInited = 0; //已初始化符号
 var lastActiveTab = 1; //记录上次激活的tab
 
 var Init = function(){
@@ -21,7 +27,40 @@ var Init = function(){
 	if(!io.exist(rcConfig_Path)){
 		var prcs = process.popen(rclone_Path,"config","touch"); //确保rclone配置文件存在，不存在会新建空文件
 	}
+	if(isInited==0){
+		frmTab1.cbb_sections.items = sectionNames;
+		frmTab2.cbb_sections.items = sectionNames;
+		frmTab3.cbb_sections.items = sectionNames;
+		frmTab1.cbb_sections.selIndex = 1;
+		frmTab2.cbb_sections.selIndex = 1;
+		frmTab3.cbb_sections.selIndex = 1;
+		isInited = 1;
+	}
 }
+
+// 在tab2里删减库时，同步重置其他tab的库列表
+ReloadOtherTabSectionList = function(sectionList,selText){
+	currentSectionText_tab1 = frmTab1.cbb_sections.selText;
+	currentSectionText_tab3 = frmTab3.cbb_sections.selText;
+/*
+	frmTab1.cbb_sections.clear();
+    frmTab1.cbb_sections.addItems(sectionList);
+    frmTab3.cbb_sections.clear();
+    frmTab3.cbb_sections.addItems(sectionList);
+*/
+	frmTab1.cbb_sections.items = sectionList;
+	frmTab3.cbb_sections.items = sectionList;
+	frmTab1.cbb_sections.selIndex = 1;
+	frmTab3.cbb_sections.selIndex = 1;
+    if(#selText){
+    	frmTab1.cbb_sections.selText = selText;
+    	frmTab3.cbb_sections.selText = selText;
+    } else{
+    	frmTab1.cbb_sections.selText = currentSectionText_tab1;
+    	frmTab3.cbb_sections.selText = currentSectionText_tab3;
+    }
+}
+
 
 mainForm.tab.onSelChange = function(index){
 	if(index == 2 && lastActiveTab != 2){
@@ -32,8 +71,9 @@ mainForm.tab.onSelChange = function(index){
 
 frmTab1.cbb_sections.onSelChange = function(){
 	frmTab2.cbb_sections.selText = frmTab1.cbb_sections.selText;
+	frmTab3.cbb_sections.selText = frmTab1.cbb_sections.selText;
 }
 
-Init();
 mainForm.show();
+Init();
 win.loopMessage();

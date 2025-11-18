@@ -48,10 +48,11 @@ remote:";left=16;top=117;right=112;bottom=149;dl=1;dt=1;transparent=1;z=11}
 
 var isEdtingConfig = 0;
 var isAddingNewSection = 0;
+
 var rclone_Path = "\res\rclone.exe";
 var rcConfig_Path = "\res\rclone.conf";
 //var rcConfig_FullPath = io.fullpath(rcConfig_Path); //配置文件的绝对路径
-var rcCfg = fsys.ini(rcConfig_Path);
+var rcCfg = fsys.ini(rcConfig_Path); //设置配置文件的对象
 var sectionNames = rcCfg.getSectionNames(); // 获取所有小节名字,返回字符串数组
 
 // 窗口初始化后的初始化函数
@@ -66,7 +67,7 @@ var Init = function(){
 		frmTab2.cbb_sections.selIndex = 1;
 	}
 	
-	selSection = rcCfg.getSection(frmTab2.cbb_sections.selText); // 读取或添加小节对象,可直接读写成员 返回对象:inisectionObject
+	//selSection = rcCfg.getSection(frmTab2.cbb_sections.selText); // 读取或添加小节对象,可直接读写成员 返回对象:inisectionObject
 	selSectionName = frmTab2.cbb_sections.selText; // 当前选择的小节名
 	ReadConfig(selSectionName);
 }
@@ -380,6 +381,7 @@ ReloadSectionList = function(newSelText,newIndex=1){
 	if(#newSelText){
 		frmTab2.cbb_sections.selText = newSelText;
 	}
+	ReloadOtherTabSectionList(sectionNames);
 	var newSSName = frmTab2.cbb_sections.selText;
 	var countSNames = #sectionNames;
 	return newSSName,countSNames; 

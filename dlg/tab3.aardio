@@ -1,0 +1,31 @@
+import win.ui;
+/*DSG{{*/
+var frmtab3 = win.form(text="操作";right=399;bottom=499)
+frmtab3.add(
+button={cls="button";text="目录";left=344;top=96;right=384;bottom=124;dl=1;dr=1;dt=1;z=5};
+cbb_sections={cls="combobox";left=152;top=16;right=312;bottom=42;dl=1;dr=1;dt=1;edge=1;font=LOGFONT(h=-24);items={};mode="dropdownlist";z=1};
+edt_sourcePath={cls="edit";left=16;top=96;right=336;bottom=124;edge=1;multiline=1;z=4};
+static={cls="static";text="当前操作库：";left=16;top=24;right=152;bottom=56;dl=1;dt=1;font=LOGFONT(h=-21);transparent=1;z=2};
+static3={cls="static";text="源目录";left=16;top=64;right=88;bottom=96;dl=1;dt=1;font=LOGFONT(h=-19);transparent=1;z=3};
+stc_caption={cls="static";text="说明";left=16;top=136;right=384;bottom=224;transparent=1;z=6}
+)
+/*}}*/
+
+var caption='说明\n
+选择要进行加密操作的目录作为源目录\n
+将执行从源目录→加密库的对应操作\n
+例如同步sync，将源目录内的文件和文件夹，同步到加密库所在的虚拟盘或目录'
+
+var Init = function(){
+	frmtab3.stc_caption.text = caption;
+}
+
+
+frmtab3.button.oncommand = function(id,event){
+	
+}
+
+frmtab3.show();
+Init();
+win.loopMessage();
+return frmtab3;
