@@ -10,22 +10,24 @@ var frmTab1 = mainForm.tab.loadForm("\dlg\tab1.aardio");
 var frmTab2 = mainForm.tab.loadForm("\dlg\tab2.aardio");
 var frmTab3 = mainForm.tab.loadForm("\dlg\tab3.aardio");
 
-var rclone_Path = "\res\rclone.exe";
-var rcConfig_Path = "\res\rclone.conf";
-//var rcConfig_FullPath = io.fullpath(rcConfig_Path); //配置文件的绝对路径
-var rcCfg = fsys.ini(rcConfig_Path); //设置配置文件的对象
-var sectionNames = rcCfg.getSectionNames(); // 获取所有小节名字,返回字符串数组
+// 全局变量
+..rclone_Path = "\res\rclone.exe";
+..rclone_FullPath = io.fullpath(..rclone_Path); 
+..rcConfig_Path = "\res\rclone.conf";
+..rcConfig_FullPath = io.fullpath(..rcConfig_Path); //配置文件的绝对路径
+..rcCfg = fsys.ini(..rcConfig_FullPath); //设置配置文件的对象
+..sectionNames = ..rcCfg.getSectionNames(); // 获取所有小节名字,返回字符串数组
 
 var isInited = 0; //已初始化符号
 var lastActiveTab = 1; //记录上次激活的tab
 
 var Init = function(){
-	if(!io.exist(rclone_Path)){
+	if(!io.exist(..rclone_Path)){
 		mainForm.msgboxErr("rclone.exe程序不存在，请手动下载放到res目录下","核心程序不存在");
 		return ; 
 	}
-	if(!io.exist(rcConfig_Path)){
-		var prcs = process.popen(rclone_Path,"config","touch"); //确保rclone配置文件存在，不存在会新建空文件
+	if(!io.exist(..rcConfig_Path)){
+		var prcs = process.popen(..rclone_Path,"config","touch"); //确保rclone配置文件存在，不存在会新建空文件
 	}
 	if(isInited==0){
 		frmTab1.cbb_sections.items = sectionNames;
@@ -38,25 +40,24 @@ var Init = function(){
 	}
 }
 
-// 在tab2里删减库时，同步重置其他tab的库列表
-ReloadOtherTabSectionList = function(sectionList,selText){
+// 同步重置所有tab的库列表
+ReloadTabSectionList = function(sectionList,selText){
 	currentSectionText_tab1 = frmTab1.cbb_sections.selText;
+	currentSectionText_tab2 = frmTab2.cbb_sections.selText;
 	currentSectionText_tab3 = frmTab3.cbb_sections.selText;
-/*
-	frmTab1.cbb_sections.clear();
-    frmTab1.cbb_sections.addItems(sectionList);
-    frmTab3.cbb_sections.clear();
-    frmTab3.cbb_sections.addItems(sectionList);
-*/
 	frmTab1.cbb_sections.items = sectionList;
+	frmTab2.cbb_sections.items = sectionList;
 	frmTab3.cbb_sections.items = sectionList;
 	frmTab1.cbb_sections.selIndex = 1;
+	frmTab2.cbb_sections.selIndex = 1;
 	frmTab3.cbb_sections.selIndex = 1;
     if(#selText){
     	frmTab1.cbb_sections.selText = selText;
+    	frmTab2.cbb_sections.selText = selText;
     	frmTab3.cbb_sections.selText = selText;
     } else{
     	frmTab1.cbb_sections.selText = currentSectionText_tab1;
+    	frmTab2.cbb_sections.selText = currentSectionText_tab2;
     	frmTab3.cbb_sections.selText = currentSectionText_tab3;
     }
 }

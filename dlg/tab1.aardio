@@ -4,13 +4,14 @@ import process.popen;
 import string;
 import fsys.ini;
 import fsys;
+import fonts.fontAwesome;
 /*DSG{{*/
 var frmTab1 = win.form(text="挂载";right=399;bottom=499;max=false)
 frmTab1.add(
 btn_mount={cls="button";text="挂载";left=240;top=64;right=312;bottom=104;dl=1;dt=1;font=LOGFONT(h=-21);z=1};
 btn_netMount={cls="button";text="映射";left=240;top=208;right=312;bottom=248;dl=1;dt=1;font=LOGFONT(h=-21);z=15};
 btn_openMountPath={cls="button";text="打开";left=320;top=64;right=392;bottom=104;disabled=1;dl=1;dt=1;font=LOGFONT(h=-21);z=20};
-btn_showPwd={cls="button";text="显";left=232;top=296;right=256;bottom=320;dl=1;dt=1;z=19};
+btn_showPwd={cls="button";text='\uF06E';left=232;top=296;right=256;bottom=320;dl=1;dt=1;font=LOGFONT(name='FontAwesome');z=19};
 cbb_driveList={cls="combobox";left=152;top=80;right=194;bottom=106;border=1;edge=1;font=LOGFONT(h=-16);items={"H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"};mode="dropdown";z=3};
 cbb_sections={cls="combobox";left=152;top=16;right=312;bottom=42;db=1;dl=1;dr=1;dt=1;edge=1;font=LOGFONT(h=-24);items={};mode="dropdownlist";z=18};
 cbb_serverPort={cls="combobox";left=120;top=216;right=224;bottom=242;dt=1;edge=1;font=LOGFONT(h=-16);items={"9990","12222"};mode="dropdown";z=10};
@@ -30,16 +31,11 @@ static7={cls="static";text="用户名：";left=24;top=256;right=128;bottom=288;d
 )
 /*}}*/
 
-var rclone_Path = "\res\rclone.exe"
-var cfgPath = "\res\rclone.conf";
-var rcCfg = fsys.ini(cfgPath);
-var sectionNames = rcCfg.getSectionNames();
-
 var isMounted = 0 //是否挂载
 var isNetMounted = 0; //是否网络映射
 
 if(frmTab1.cbb_sections.count==0){
-	frmTab1.cbb_sections.addItems(sectionNames);
+	frmTab1.cbb_sections.addItems(..sectionNames);
 	frmTab1.cbb_sections.selIndex = 1;
 }
 
@@ -57,8 +53,8 @@ frmTab1.btn_mount.oncommand = function(id,event){
 		vaultName_Mounted = vaultName;
 		var vaultName_cmd = vaultName + ":";
 		var t1 = "将库 " ++ vaultName ++ " 挂载在" ++ ds ++ "盘";
-		prcs_cmd = process.joinArguments(rclone_Path,"mount",vaultName_cmd,ds_cmd,"--vfs-cache-mode","full","--dir-cache-time","60s"); // dir-cache-time defualt 5min
-		prcs = process.popen(rclone_Path,"mount",vaultName_cmd,ds_cmd,"--vfs-cache-mode","full","--dir-cache-time","60s");
+		prcs_cmd = process.joinArguments(..rclone_Path,"mount",vaultName_cmd,ds_cmd,"--vfs-cache-mode","full","--dir-cache-time","60s","--links"); // dir-cache-time defualt 5min
+		prcs = process.popen(..rclone_Path,"mount",vaultName_cmd,ds_cmd,"--vfs-cache-mode","full","--dir-cache-time","60s","--links");
 		TextLog("程序执行命令为： "+prcs_cmd);
 		TextLog(t1);
 		prcs.logResponse(frmTab1.edt_LogShow);
@@ -127,12 +123,12 @@ frmTab1.btn_netMount.oncommand = function(id,event){
 	}
 	elseif(isNetMounted == 0){
 		if(nm_serverUser==""){
-			netPrcs_cmd = process.joinArguments(rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort);
-			netPrcs,netPrcsErr = process.popen(rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort);
+			netPrcs_cmd = process.joinArguments(..rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort);
+			netPrcs,netPrcsErr = process.popen(..rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort);
 		}
 		else{
-			netPrcs_cmd = process.joinArguments(rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort,"--user",nm_serverUser,"--pass",nm_serverPwd);
-			netPrcs,netPrcsErr = process.popen(rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort,"--user",nm_serverUser,"--pass",nm_serverPwd);
+			netPrcs_cmd = process.joinArguments(..rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort,"--user",nm_serverUser,"--pass",nm_serverPwd);
+			netPrcs,netPrcsErr = process.popen(..rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort,"--user",nm_serverUser,"--pass",nm_serverPwd);
 		}
 		if(!netPrcs) { 
 			return winform.msgboxErr(netPrcsErr); 
@@ -178,11 +174,11 @@ frmTab1.onClose = function(hwnd,message,wParam,lParam){
 frmTab1.btn_showPwd.oncommand = function(id,event){
 	if(frmTab1.edt_serverPwd.passwordChar){
 	frmTab1.edt_serverPwd.passwordChar = null;
-	frmTab1.btn_showPwd.text = "隐";
+	frmTab1.btn_showPwd.text = '\uF070'; //"隐"
 	}
 	else{
 	frmTab1.edt_serverPwd.passwordChar = "*";
-	frmTab1.btn_showPwd.text = "显";	
+	frmTab1.btn_showPwd.text = '\uF06E' ; //"显"
 	}
 }
 
