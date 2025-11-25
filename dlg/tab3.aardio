@@ -7,13 +7,13 @@ import console;
 var frmTab3 = win.form(text="操作";right=399;bottom=499)
 frmTab3.add(
 btn_copy={cls="button";text="复制
-Copy";left=16;top=208;right=96;bottom=248;db=0.5;dl=0.04;dr=0.76;dt=0.42;font=LOGFONT(h=-15);z=7};
+Copy";left=16;top=208;right=96;bottom=248;db=0.5;dl=0.04;dr=0.76;dt=0.42;font=LOGFONT(h=-13);z=7};
 btn_dstPathDlg={cls="button";text='\uF07C';left=344;top=160;right=384;bottom=188;db=0.62;disabled=1;dl=0.86;dr=0.04;dt=0.32;font=LOGFONT(h=-16;name='FontAwesome');z=15};
 btn_move={cls="button";text="移动
-Move";left=152;top=208;right=232;bottom=248;db=0.5;dl=0.38;dr=0.42;dt=0.42;font=LOGFONT(h=-15);z=9};
+Move";left=152;top=208;right=232;bottom=248;db=0.5;dl=0.38;dr=0.42;dt=0.42;font=LOGFONT(h=-13);z=9};
 btn_srcPathDlg={cls="button";text='\uF07C';left=344;top=96;right=384;bottom=124;db=0.75;dl=0.86;dr=0.04;dt=0.19;font=LOGFONT(h=-16;name='FontAwesome');z=5};
 btn_sync={cls="button";text="单向同步
-Sync";left=288;top=208;right=368;bottom=248;db=0.5;dl=0.72;dr=0.08;dt=0.42;font=LOGFONT(h=-15);z=8};
+Sync";left=288;top=208;right=368;bottom=248;db=0.5;dl=0.72;dr=0.08;dt=0.42;font=LOGFONT(h=-13);z=8};
 cbb_sections={cls="combobox";left=152;top=16;right=312;bottom=42;dl=1;dr=1;dt=1;edge=1;font=LOGFONT(h=-24);items={};mode="dropdownlist";z=1};
 ckb_csvLog={cls="checkbox";text="输出CSV格式日志";left=16;top=312;right=168;bottom=336;z=12};
 ckb_dryrun={cls="checkbox";text="测试且不更改/dry-run";left=16;top=280;right=168;bottom=304;z=10};
