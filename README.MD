@@ -48,9 +48,11 @@ rclone 管理保险库有多种方式，本GUI仅使用它的 crypt存储格式�
 # 运行图
 
 <div align="center"> 
-    <img src="imgs/screenshot_tab1.jpg" width="45%" /> 
-    <img src="imgs/screenshot_tab2.jpg" width="45%" /> 
+    <img src="imgs/screenshot_tab1.jpg" width="30%" /> 
+    <img src="imgs/screenshot_tab2.jpg" width="30%" /> 
+    <img src="imgs/screenshot_tab3.jpg" width="30%" /> 
 </div>
+
 
 
 # 致谢
