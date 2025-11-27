@@ -1,6 +1,6 @@
 # RcVault
 
-基于rclone的crypt存储进行文件加密的保险箱GUI，使用aardio写就，目前只支持Windows。
+基于rclone的crypt存储进行文件加密的保险箱GUI，使用[aardio](https://www.aardio.com/)写就，目前只支持Windows。
 
 rclone 的 crypt 存储类型，可以作为用户透明加密文件的保险库，本GUI可以方便管理 rclone crypt 保险库。
 

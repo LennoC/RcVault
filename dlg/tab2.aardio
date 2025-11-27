@@ -8,6 +8,7 @@ import string.ini;
 import process;
 import process.popen;
 import fonts.fontAwesome;
+
 /*DSG{{*/
 var frmTab2 = win.form(text="库信息";right=399;bottom=499)
 frmTab2.add(
@@ -86,7 +87,9 @@ frmTab2.btn_changeSectionName.oncommand = function(id,event){
 // 查找本地文件夹的按钮，用来指定remote路径
 frmTab2.btn_remoteDirDlg.oncommand = function(id,event){
 	var dir = fsys.dlg.dir();
-	frmTab2.edt_remote.text = dir;
+	if(#dir){
+		frmTab2.edt_remote.text = dir;
+	}	
 }
 
 // 修改密码按钮

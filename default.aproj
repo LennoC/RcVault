@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<project ver="10" name="RcVault" libEmbed="true" icon="imgs\RcVault_icon_320x.ico" ui="win" output="RcVault.exe" CompanyName="Lemon&Cat" FileDescription="A private vault based on Rclone" LegalCopyright="Copyright (C) Lenno 2025" ProductName="RcVault" InternalName="RcVault" FileVersion="0.0.1.2" ProductVersion="0.0.1.2" publishDir="/dist/" dstrip="true" local="false" ignored="false">
+<project ver="10" name="RcVault" libEmbed="true" icon="imgs\RcVault_icon_320x.ico" ui="win" output="RcVault.exe" CompanyName="Lemon&Cat" FileDescription="A private vault based on Rclone" LegalCopyright="Copyright (C) Lenno 2025" ProductName="RcVault" InternalName="RcVault" FileVersion="0.0.2.0" ProductVersion="0.0.2.0" publishDir="/dist/" dstrip="true" local="false" ignored="false">
 	<file name="main.aardio" path="main.aardio" comment="main.aardio"/>
 	<folder name="资源文件" path="res" embed="false" local="false" ignored="false">
 		<file name="rclone.conf" path="res\rclone.conf" comment="res\rclone.conf"/>

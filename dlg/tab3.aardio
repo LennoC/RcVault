@@ -2,7 +2,7 @@ import win.ui;
 import fsys.dlg.dir;
 import fonts.fontAwesome;
 import process;
-import console;
+
 /*DSG{{*/
 var frmTab3 = win.form(text="操作";right=399;bottom=499)
 frmTab3.add(
@@ -27,7 +27,7 @@ stc_caption={cls="static";text="tip";left=16;top=344;right=384;bottom=496;db=0.0
 )
 /*}}*/
 
-var tip = '说明\n
+var caption = '说明\n
 1)选择要进行加密操作的目录作为源目录\n
 将执行从源目录\u2192目标加密库的对应操作\n
 同步是单向，从源同步至目标\n
@@ -36,16 +36,20 @@ var tip = '说明\n
 例如目标库crypt有目录dst和dst\\abc\n
 要复制到abc目录下，则填入dst\\abc\n
 要复制到dst目录下，则填入dst\n'
-frmTab3.stc_caption.text = tip;
+frmTab3.stc_caption.text = caption;
 
 frmTab3.btn_srcPathDlg.oncommand = function(id,event){
 	var dir = fsys.dlg.dir();
-	frmTab3.edt_srcPath.text = dir;
+	if(#dir){
+		frmTab3.edt_srcPath.text = dir;	
+	}	
 }
 
 frmTab3.btn_dstPathDlg.oncommand = function(id,event){
 	var dir = fsys.dlg.dir();
-	frmTab3.edt_dstPath.text = dir;	
+	if(#dir){
+		frmTab3.edt_dstPath.text = dir;		
+	}	
 }
 
 frmTab3.btn_copy.oncommand = function(id,event){
@@ -75,7 +79,7 @@ WithCmdArgs = function(command,id){
 		dstpath = string.trim(dstpath,"\");	
 		cmdArgs = cmdArgs + "\" + dstpath;
 	}
-	var logDate = time().format("%Y%m%d%H%M%S");
+	var logTime = time().format("%Y%m%d%H%M%S");
 	var opt;
 	select (id) {  
 		case frmTab3.btn_copy.id{
@@ -88,8 +92,8 @@ WithCmdArgs = function(command,id){
 			opt = "Sync";
 		};  
 	}
-	var fullLog = logDate + "_Rc"+ opt + "FullLog.txt";
-	var missingOnDstLog = logDate + "_Rc" + opt + "MissingOnDstLog.txt";
+	var fullLog = logTime + "_Rc"+ opt + "FullLog.txt";
+	var missingOnDstLog = logTime + "_Rc" + opt + "MissingOnDstLog.txt";
 	var logsPath = io._exedir + "Logs\";
 	if(!io.exist(logsPath)){
 		io.createDir(logsPath);
