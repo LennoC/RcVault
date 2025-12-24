@@ -7,17 +7,19 @@ import process.popen;
 var frmTab3 = win.form(text="操作";right=399;bottom=499)
 frmTab3.add(
 btn_copy={cls="button";text="复制
-Copy";left=16;top=208;right=96;bottom=248;db=0.5;dl=0.04;dr=0.76;dt=0.42;font=LOGFONT(h=-13);z=7};
+Copy";left=16;top=200;right=96;bottom=240;db=0.52;dl=0.04;dr=0.76;dt=0.4;font=LOGFONT(h=-13);z=7};
 btn_dstPathDlg={cls="button";text='\uF07C';left=344;top=160;right=384;bottom=188;db=0.62;disabled=1;dl=0.86;dr=0.04;dt=0.32;font=LOGFONT(h=-16;name='FontAwesome');z=14};
 btn_move={cls="button";text="移动
-Move";left=152;top=208;right=232;bottom=248;db=0.5;dl=0.38;dr=0.42;dt=0.42;font=LOGFONT(h=-13);z=9};
+Move";left=152;top=200;right=232;bottom=240;db=0.52;dl=0.38;dr=0.42;dt=0.4;font=LOGFONT(h=-13);z=9};
 btn_srcPathDlg={cls="button";text='\uF07C';left=344;top=96;right=384;bottom=124;db=0.75;dl=0.86;dr=0.04;dt=0.19;font=LOGFONT(h=-16;name='FontAwesome');z=5};
 btn_sync={cls="button";text="单向同步
-Sync";left=288;top=208;right=368;bottom=248;db=0.5;dl=0.72;dr=0.08;dt=0.42;font=LOGFONT(h=-13);z=8};
+Sync";left=288;top=200;right=368;bottom=240;db=0.52;dl=0.72;dr=0.08;dt=0.4;font=LOGFONT(h=-13);z=8};
 cbb_sections={cls="combobox";left=152;top=16;right=312;bottom=42;dl=1;dr=1;dt=1;edge=1;font=LOGFONT(h=-24);items={};mode="dropdownlist";z=1};
-ckb_dryrun={cls="checkbox";text="测试且不更改/dry-run";left=16;top=280;right=168;bottom=304;z=10};
-ckb_iaMode={cls="checkbox";text="交互模式/interactive";left=200;top=280;right=352;bottom=304;z=11};
-edt_caption={cls="edit";text="tip";left=16;top=344;right=384;bottom=496;db=0.01;dl=0.04;dr=0.04;dt=0.69;edge=1;hscroll=1;multiline=1;readonly=1;vscroll=1;z=6};
+ckb_addParams={cls="checkbox";text="更多自定义参数:";left=16;top=272;right=168;bottom=296;z=16};
+ckb_dryrun={cls="checkbox";text="测试且不更改/dry-run";left=16;top=248;right=168;bottom=272;z=10};
+ckb_iaMode={cls="checkbox";text="交互模式/interactive";left=200;top=248;right=352;bottom=272;z=11};
+edt_addParams={cls="edit";left=16;top=304;right=384;bottom=332;db=0.34;disabled=1;edge=1;multiline=1;z=15};
+edt_caption={cls="edit";text="tip";left=16;top=344;right=384;bottom=496;db=0.01;dl=0.04;dr=0.04;dt=0.69;edge=1;multiline=1;readonly=1;vscroll=1;z=6};
 edt_dstPath={cls="edit";left=16;top=160;right=336;bottom=188;db=0.62;edge=1;multiline=1;z=13};
 edt_srcPath={cls="edit";left=16;top=96;right=336;bottom=124;db=0.75;edge=1;multiline=1;z=4};
 static={cls="static";text="当前操作库：";left=16;top=24;right=152;bottom=56;dl=1;dt=1;font=LOGFONT(h=-21);transparent=1;z=2};
@@ -71,8 +73,10 @@ var getCmdArgs = function(command, id){
         "--progress";
         "--combined"; fullLog;
         "--missing-on-dst"; missingLog;
+        "--create-empty-src-dirs";
     };
     
+    if(command == "move") table.push(args,"--delete-empty-src-dirs");    
     if(frmTab3.ckb_dryrun.checked) table.push(args, "--dry-run");
     if(frmTab3.ckb_iaMode.checked) table.push(args, "--interactive");
     
@@ -88,6 +92,10 @@ var executeInCmd = function(command, id){
     var argStr = "";
     for(i=1; #args; 1){
         argStr += string.format(' "%s"', args[i]);
+    }
+    
+    if(frmTab3.ckb_addParams.checked){
+    	argStr += " " ++ frmTab3.edt_addParams.text;
     }
     
     // 最终命令：chcp 65001 解决中文乱码，&& 连接后续命令
@@ -116,6 +124,14 @@ frmTab3.btn_dstPathDlg.oncommand = function(id,event){
 frmTab3.btn_copy.oncommand = function(id,event){ executeInCmd("copy", id); }
 frmTab3.btn_move.oncommand = function(id,event){ executeInCmd("move", id); }
 frmTab3.btn_sync.oncommand = function(id,event){ executeInCmd("sync", id); }
+
+frmTab3.ckb_addParams.oncommand = function(id,event){
+	if(frmTab3.ckb_addParams.checked){
+		frmTab3.edt_addParams.disabled = false;
+	} else{
+		frmTab3.edt_addParams.disabled = true;
+	}	
+}
 
 frmTab3.show();
 win.loopMessage();
