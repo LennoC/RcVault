@@ -2,117 +2,121 @@ import win.ui;
 import fsys.dlg.dir;
 import fonts.fontAwesome;
 import process;
-
+import process.popen;
 /*DSG{{*/
 var frmTab3 = win.form(text="操作";right=399;bottom=499)
 frmTab3.add(
 btn_copy={cls="button";text="复制
 Copy";left=16;top=208;right=96;bottom=248;db=0.5;dl=0.04;dr=0.76;dt=0.42;font=LOGFONT(h=-13);z=7};
-btn_dstPathDlg={cls="button";text='\uF07C';left=344;top=160;right=384;bottom=188;db=0.62;disabled=1;dl=0.86;dr=0.04;dt=0.32;font=LOGFONT(h=-16;name='FontAwesome');z=15};
+btn_dstPathDlg={cls="button";text='\uF07C';left=344;top=160;right=384;bottom=188;db=0.62;disabled=1;dl=0.86;dr=0.04;dt=0.32;font=LOGFONT(h=-16;name='FontAwesome');z=14};
 btn_move={cls="button";text="移动
 Move";left=152;top=208;right=232;bottom=248;db=0.5;dl=0.38;dr=0.42;dt=0.42;font=LOGFONT(h=-13);z=9};
 btn_srcPathDlg={cls="button";text='\uF07C';left=344;top=96;right=384;bottom=124;db=0.75;dl=0.86;dr=0.04;dt=0.19;font=LOGFONT(h=-16;name='FontAwesome');z=5};
 btn_sync={cls="button";text="单向同步
 Sync";left=288;top=208;right=368;bottom=248;db=0.5;dl=0.72;dr=0.08;dt=0.42;font=LOGFONT(h=-13);z=8};
 cbb_sections={cls="combobox";left=152;top=16;right=312;bottom=42;dl=1;dr=1;dt=1;edge=1;font=LOGFONT(h=-24);items={};mode="dropdownlist";z=1};
-ckb_csvLog={cls="checkbox";text="输出CSV格式日志";left=16;top=312;right=168;bottom=336;z=12};
 ckb_dryrun={cls="checkbox";text="测试且不更改/dry-run";left=16;top=280;right=168;bottom=304;z=10};
 ckb_iaMode={cls="checkbox";text="交互模式/interactive";left=200;top=280;right=352;bottom=304;z=11};
-edt_dstPath={cls="edit";left=16;top=160;right=336;bottom=188;db=0.62;edge=1;multiline=1;z=14};
+edt_caption={cls="edit";text="tip";left=16;top=344;right=384;bottom=496;db=0.01;dl=0.04;dr=0.04;dt=0.69;edge=1;hscroll=1;multiline=1;readonly=1;vscroll=1;z=6};
+edt_dstPath={cls="edit";left=16;top=160;right=336;bottom=188;db=0.62;edge=1;multiline=1;z=13};
 edt_srcPath={cls="edit";left=16;top=96;right=336;bottom=124;db=0.75;edge=1;multiline=1;z=4};
 static={cls="static";text="当前操作库：";left=16;top=24;right=152;bottom=56;dl=1;dt=1;font=LOGFONT(h=-21);transparent=1;z=2};
-static2={cls="static";text="目标目录(可留空,库内目录)";left=16;top=128;right=384;bottom=160;db=0.68;dl=1;dt=1;font=LOGFONT(h=-19);transparent=1;z=13};
-static3={cls="static";text="源目录";left=16;top=64;right=88;bottom=96;db=0.81;dl=1;dt=1;font=LOGFONT(h=-19);transparent=1;z=3};
-stc_caption={cls="static";text="tip";left=16;top=344;right=384;bottom=496;db=0.01;dl=0.04;dr=0.04;dt=0.69;transparent=1;z=6}
+static2={cls="static";text="目标目录(可留空,库内目录)";left=16;top=128;right=384;bottom=160;db=0.68;dl=1;dt=1;font=LOGFONT(h=-19);transparent=1;z=12};
+static3={cls="static";text="源目录";left=16;top=64;right=88;bottom=96;db=0.81;dl=1;dt=1;font=LOGFONT(h=-19);transparent=1;z=3}
 )
 /*}}*/
 
-var caption = '说明\n
-1)选择要进行加密操作的目录作为源目录\n
-将执行从源目录\u2192目标加密库的对应操作\n
-同步是单向，从源同步至目标\n
-2)少量文件建议挂载后操作\n
-3)目标目录应只填库内的目录名\n
-例如目标库crypt有目录dst和dst\\abc\n
-要复制到abc目录下，则填入dst\\abc\n
-要复制到dst目录下，则填入dst\n'
-frmTab3.stc_caption.text = caption;
+var caption = '说明\r\n
+1)选择要进行加密操作的目录作为源目录\r\n
+将执行从源目录\u2192目标加密库的对应操作\r\n
+同步是单向，从源同步至目标\r\n
+2)少量文件建议挂载后操作\r\n
+3)目标目录应只填库内的目录名\r\n
+例如目标库crypt有目录dst和dst\\abc\r\n
+要复制到abc目录下，则填入dst\\abc\r\n
+要复制到dst目录下，则填入dst\r\n'
+frmTab3.edt_caption.text = caption;
+
+// 构造参数数组
+var getCmdArgs = function(command, id){
+    var srcPath = string.trim(frmTab3.edt_srcPath.text);
+    var section = frmTab3.cbb_sections.selText;
+    
+    if(!#srcPath || !#section) return null, "请先选择源目录和操作库";
+    
+    // 构造远程路径 (remote:path)
+    var remotePath = section + ":";
+    var dstSub = string.trim(frmTab3.edt_dstPath.text : "");
+    if(#dstSub){
+        dstSub = string.replace(dstSub, "\\", "/"); // rclone 远程路径统一用正斜杠
+        dstSub = string.trim(dstSub, "/");
+        remotePath = remotePath + "/" + dstSub;
+    }
+
+    // 准备日志
+    var logTime = time().format("%Y%m%d%H%M%S");
+    var opt = (id == frmTab3.btn_copy.id) ? "Copy" : ((id == frmTab3.btn_move.id) ? "Move" : "Sync");
+    var logsPath = io.fullpath("/Logs/");
+    if(!io.exist(logsPath)) io.createDir(logsPath);
+
+    var fullLog = io.joinpath(logsPath, logTime + "_Rc" + opt + "FullLog.txt");
+    var missingLog = io.joinpath(logsPath, logTime + "_Rc" + opt + "MissingOnDstLog.txt");
+
+    // 将所有参数放入数组，aardio 之后会自动处理双引号
+    var args = {
+        command;
+        srcPath;
+        remotePath;
+        "--absolute";
+        "--progress";
+        "--combined"; fullLog;
+        "--missing-on-dst"; missingLog;
+    };
+    
+    if(frmTab3.ckb_dryrun.checked) table.push(args, "--dry-run");
+    if(frmTab3.ckb_iaMode.checked) table.push(args, "--interactive");
+    
+    return args;
+}
+
+// 核心执行函数：调起 CMD
+var executeInCmd = function(command, id){
+    var args, err = getCmdArgs(command, id);
+    if(!args) return frmTab3.msgbox(err);
+    
+    // 将数组转为 CMD 字符串，并为每个参数强制包裹双引号
+    var argStr = "";
+    for(i=1; #args; 1){
+        argStr += string.format(' "%s"', args[i]);
+    }
+    
+    // 最终命令：chcp 65001 解决中文乱码，&& 连接后续命令
+    // 使用 /k 保持窗口打开，/c 则是运行完自动关闭
+    var finalCmd = string.format('chcp 65001 && "%s" %s', ..rclone_FullPath, argStr);
+    
+    frmTab3.edt_caption.text = "已调起 CMD 窗口执行任务。" 
+        + '\r\n' + "---------------------------------"
+        + '\r\n' + "当前执行: " + command
+        + '\r\n' + "---------------------------------"
+        + '\r\n' + "完整命令: " + finalCmd;
+
+    process("cmd.exe", "/k " + finalCmd);
+}
 
 frmTab3.btn_srcPathDlg.oncommand = function(id,event){
-	var dir = fsys.dlg.dir();
-	if(#dir){
-		frmTab3.edt_srcPath.text = dir;	
-	}	
+    var dir = fsys.dlg.dir();
+    if(dir) frmTab3.edt_srcPath.text = dir;    
 }
 
 frmTab3.btn_dstPathDlg.oncommand = function(id,event){
-	var dir = fsys.dlg.dir();
-	if(#dir){
-		frmTab3.edt_dstPath.text = dir;		
-	}	
+    var dir = fsys.dlg.dir();
+    if(dir) frmTab3.edt_dstPath.text = dir;        
 }
 
-frmTab3.btn_copy.oncommand = function(id,event){
-	var opreation = "copy" 
-	cmdline = WithCmdArgs(opreation,id);
-	process("cmd","/k",cmdline);
-}
-
-frmTab3.btn_move.oncommand = function(id,event){
-	var opreation = "move" 
-	cmdline = WithCmdArgs(opreation,id);
-	process("cmd","/k",cmdline);
-}
-
-frmTab3.btn_sync.oncommand = function(id,event){
-	var opreation = "sync" 
-	cmdline = WithCmdArgs(opreation,id);
-	process("cmd","/k",cmdline);	
-}
-
-WithCmdArgs = function(command,id){
-	cmdArgs = command + " " + frmTab3.edt_srcPath.text + " " + frmTab3.cbb_sections.selText + ":";
-	if(#frmTab3.edt_dstPath.text){
-		cmdArgs = string.trimright(cmdArgs,'"');
-		var dstpath = frmTab3.edt_dstPath.text;
-		dstpath = string.replace(dstpath,"/","\");
-		dstpath = string.trim(dstpath,"\");	
-		cmdArgs = cmdArgs + "\" + dstpath;
-	}
-	var logTime = time().format("%Y%m%d%H%M%S");
-	var opt;
-	select (id) {  
-		case frmTab3.btn_copy.id{
-			opt = "Copy";
-		};
-		case frmTab3.btn_move.id{
-			opt = "Move";
-		}; 
-		case frmTab3.btn_sync.id{
-			opt = "Sync";
-		};  
-	}
-	var fullLog = logTime + "_Rc"+ opt + "FullLog.txt";
-	var missingOnDstLog = logTime + "_Rc" + opt + "MissingOnDstLog.txt";
-	var logsPath = io._exedir + "Logs\";
-	if(!io.exist(logsPath)){
-		io.createDir(logsPath);
-	}
-	var cmdArgs = cmdArgs + " --progress --absolute --combined " + logsPath + fullLog + " --missing-on-dst " + logsPath + missingOnDstLog;
-	if(frmTab3.ckb_csvLog.checked){
-		cmdArgs = cmdArgs + " --csv";
-	}
-	if(frmTab3.ckb_dryrun.checked){
-		cmdArgs = cmdArgs + " --dry-run";
-	}
-	if(frmTab3.ckb_iaMode.checked){
-		cmdArgs = cmdArgs + " --interactive";
-	}
-	cmdArgs = ..rclone_FullPath + " " + cmdArgs;
-	return cmdArgs; 
-}
-
+frmTab3.btn_copy.oncommand = function(id,event){ executeInCmd("copy", id); }
+frmTab3.btn_move.oncommand = function(id,event){ executeInCmd("move", id); }
+frmTab3.btn_sync.oncommand = function(id,event){ executeInCmd("sync", id); }
 
 frmTab3.show();
 win.loopMessage();
-return frmtab3;
+return frmTab3;
