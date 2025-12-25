@@ -48,135 +48,340 @@ remote:";left=16;top=117;right=112;bottom=149;dl=1;dt=1;transparent=1;z=11}
 )
 /*}}*/
 
+// --- 局部变量 ---
 var isEdtingConfig = 0;
 var isAddingNewSection = 0;
 
-// 切换小节名时读取配置
+// --- 辅助函数：安全设置 ComboBox ---
+var setComboboxSafe = function(ctrl, val, defaultItems){
+	ctrl.items = defaultItems; // 重置为默认列表
+	var lowerVal = string.lower(val : ""); // 处理 null
+	
+	// 尝试匹配默认值
+	for(i=1; #defaultItems; 1){
+		if(string.lower(defaultItems[i]) == lowerVal){
+			ctrl.selIndex = i;
+			return;
+		}
+	}
+	
+	// 如果值存在但不在默认列表中，添加提示并选中
+	if(#lowerVal){
+		var tip = val ++ " (无效值!)";
+		ctrl.add(tip);
+		ctrl.selIndex = ctrl.count;
+	} else {
+		ctrl.selIndex = null;
+	}
+}
+
+// --- 【新增】 UI 状态暂存与恢复函数 ---
+var GetUiState = function(){
+	return {
+		remote = frmTab2.edt_remote.text;
+		filename_encryption = frmTab2.cbb_fileNameEncrypt.selText;
+		directory_name_encryption = frmTab2.cbb_dirNameEncrypt.selText;
+		suffix = frmTab2.edt_suffix.text;
+	};
+}
+
+var RestoreUiState = function(state){
+	if(!state) return;
+	frmTab2.edt_remote.text = state.remote;
+	frmTab2.edt_suffix.text = state.suffix;
+	// 恢复 ComboBox 选中项
+	setComboboxSafe(frmTab2.cbb_fileNameEncrypt, state.filename_encryption, {"off","standard","obfuscate"});
+	setComboboxSafe(frmTab2.cbb_dirNameEncrypt, state.directory_name_encryption, {"false","true"});
+}
+
+// --- 核心逻辑函数 ---
+
+// 校验输入
+var SectionValidateInput = function(text){	
+	var errorTip = "";
+    if(string.left(text,1) == "_"){
+        text = string.trimleft(text,"_");
+        errorTip = "不能以下划线_开头";
+    }
+    // 使用模式匹配检查是否只包含数字、字母或下划线
+    if(!string.match(text, "^[\w]+$")) {
+        // 清除非法字符
+        text = string.replace(text, "[^\w]", "");
+        errorTip = errorTip ++ '\n' ++ "只能输入数字、字母或下划线";
+    }
+    if(#errorTip){
+    	errorTip = errorTip ++ '\n' ++ "实际存入的库名为：" ++ text;
+    }
+    text = string.trim(text);
+    return text, errorTip; 
+}
+
+// 刷新全局配置对象（当文件在磁盘被修改后调用）
+var RefreshGlobalConfig = function(){
+	..rcCfg = fsys.ini(..rcConfig_FullPath); // 重新加载 INI 文件
+	..sectionNames = ..rcCfg.getSectionNames(); // 更新小节列表
+}
+
+// 重新加载并同步所有 Tab
+var ReloadSectionList = function(newSelText, newIndex=1){
+	RefreshGlobalConfig(); // 1. 刷新内存对象
+	if(type(ReloadTabSectionList) == "function"){
+		ReloadTabSectionList(..sectionNames, newSelText); // 2. 调用 Main 的同步函数
+	}
+	
+	// 3. 处理 Tab2 自身的选中逻辑
+	if(newIndex == -1){ // -1 代表选中最后一个
+		newIndex = frmTab2.cbb_sections.count;
+	}
+	
+	// 如果指定了文本，优先尝试选中文本
+	if(#newSelText){
+		var idx = frmTab2.cbb_sections.find(newSelText);
+		if(idx) newIndex = idx;
+	}
+	
+	frmTab2.cbb_sections.selIndex = newIndex;
+	return frmTab2.cbb_sections.selText;
+}
+
+// 读取对应小节名的配置信息
+var ReadConfig = function(section){
+	if(!io.exist(..rcConfig_FullPath) || io.getSize(..rcConfig_FullPath)==0){
+		frmTab2.msgboxErr("配置文件为空，请新建库");
+		return;
+	} 
+	
+	// 确保 section 存在
+	if(!section || !table.find(..sectionNames, section)){
+		// 可能是删除了，不做处理或清空
+		return;
+	}
+
+	var selSection = ..rcCfg.getSection(section);
+	if(!selSection){
+		frmTab2.msgboxErr("读取小节信息失败: " ++ section);
+		return;
+	}
+	
+	frmTab2.edt_type.text = selSection.type;
+	frmTab2.edt_remote.text = selSection.remote;
+	frmTab2.edt_password.text = selSection.password;
+	frmTab2.edt_password2.text = selSection.password2;
+	frmTab2.edt_suffix.text = selSection.suffix;
+	
+	// 使用辅助函数设置 ComboBox，逻辑大幅简化
+	setComboboxSafe(frmTab2.cbb_fileNameEncrypt, selSection.filename_encryption, {"off","standard","obfuscate"});
+	setComboboxSafe(frmTab2.cbb_dirNameEncrypt, selSection.directory_name_encryption, {"false","true"});
+}
+
+// 调用 Rclone 命令修改密码
+var RcloneChangePassword = function(section, key, newPwd){
+	key = string.lower(key);
+	if(key != "password" and key != "password2"){
+		return 0, "key 只能是 password 或 password2"; 
+	}
+	
+	// 构造参数数组，避免拼接字符串出错
+	var args = {"config"; "update"; section; key ++ "=" ++ newPwd};
+	
+	if(#newPwd <= 22){
+		table.push(args, "--obscure");
+	} else {
+		table.push(args, "--no-obscure");
+	}
+	
+	var prcs = process.popen(..rclone_Path, args);
+	var stdOut, stdErr = prcs.readAll();
+	
+	if(#stdErr){
+		frmTab2.msgboxErr(stdErr, "Rclone 修改密码失败");
+		return 0;
+	}
+	return 1; 	
+}
+
+// 控制控件禁用状态
+var ChangeEditControllerDisabledTo = function(toStatus, originalPwd=false){
+	frmTab2.btn_changeSectionName.disabled = toStatus;
+	frmTab2.btn_remoteDirDlg.disabled = toStatus;
+	frmTab2.edt_remote.readonly = toStatus;
+	frmTab2.cbb_fileNameEncrypt.disabled = toStatus;
+	frmTab2.cbb_dirNameEncrypt.disabled = toStatus;
+	frmTab2.edt_suffix.readonly = toStatus;	
+	frmTab2.btn_saveConfig.disabled = toStatus;
+	
+	if(originalPwd == true){
+		frmTab2.btn_changeSalt.disabled = true;
+		frmTab2.btn_changePwd.disabled = true;
+	} else{
+		frmTab2.btn_changeSalt.disabled = toStatus;
+		frmTab2.btn_changePwd.disabled = toStatus;
+	}	
+	frmTab2.edt_password.readonly = !originalPwd;
+	frmTab2.edt_password2.readonly = !originalPwd;
+}
+
+// --- 事件回调 ---
+
+// 切换小节
 frmTab2.cbb_sections.onSelChange = function(){ 
-	selSectionName = frmTab2.cbb_sections.selText; // 当前选择的小节名
+	var selSectionName = frmTab2.cbb_sections.selText; 
 	ReadConfig(selSectionName);
 }
 
-// 修改小节名/库名的按钮
+// 改名
 frmTab2.btn_changeSectionName.oncommand = function(id,event){
-	selSectionName = frmTab2.cbb_sections.selText; 
-	oldSelSectionIndex = frmTab2.cbb_sections.selIndex;
-	var newSectionName = frmTab2.inputBox("输入要修改的库名/SECTION，也是rclone的remote名","修改库名/SECTION/REMOTE",,
-											"不能_开头和空格结尾，只能使用英文字母、数字和下划线");
-	if(#newSectionName = 0){return;}
-	else{
-		newSectionName,errorTip = SectionValidateInput(newSectionName);
-		if(#errorTip){
-			frmTab2.msgboxErr(errorTip);
-		}
-		var oriContent = string.load(..rcConfig_FullPath);
-		var oldSectionName = "[" + selSectionName +"]" ;
-		var newSectionName =  "[" + newSectionName +"]" ;
-		// 检查新 section 是否已存在
-    	if(string.indexOf(oriContent, newSectionName)) {
-        	frmTab2.msgboxErr("新 section 已存在: " + newSectionName,"更换小节/SECTION名");
-        	return false; 
-    	}
-    	// 替换 section 名称,因为带[]所以要前后<@+@>来禁用模式匹配
-    	var newContent = string.replace(oriContent, "<@"+oldSectionName+"@>", newSectionName);
-    	string.save(..rcConfig_FullPath,newContent,false);
-	}
-	ReloadSectionList(oldSelSectionIndex);
+	var selSectionName = frmTab2.cbb_sections.selText; 
+	var oldSelSectionIndex = frmTab2.cbb_sections.selIndex;
+	
+	var newSectionName = frmTab2.inputBox("输入新库名(Remote Name)","修改库名",,
+											"只能使用英文字母、数字和下划线，不能_开头");
+	
+	if(!#newSectionName) return;
+	
+	var errorTip;
+	newSectionName, errorTip = SectionValidateInput(newSectionName);
+	if(#errorTip) frmTab2.msgboxErr(errorTip);
+
+	// 读取当前文件内容进行文本替换
+	var oriContent = string.load(..rcConfig_FullPath);
+	var strOldSection = "[" ++ selSectionName ++ "]";
+	var strNewSection = "[" ++ newSectionName ++ "]";
+	
+	// 检查重复
+    if(string.indexOf(oriContent, strNewSection)) {
+        frmTab2.msgboxErr("名称已存在: " ++ newSectionName, "错误");
+        return; 
+    }
+    
+    // 使用字面量替换(@前缀)
+    var newContent = string.replace(oriContent, "@" ++ strOldSection, strNewSection);
+    string.save(..rcConfig_FullPath, newContent, false);
+
+	// 刷新列表并选中新名字
+	ReloadSectionList(newSectionName);
+	ReadConfig(newSectionName);
 }
 
-// 查找本地文件夹的按钮，用来指定remote路径
+// 选择目录
 frmTab2.btn_remoteDirDlg.oncommand = function(id,event){
 	var dir = fsys.dlg.dir();
-	if(#dir){
-		frmTab2.edt_remote.text = dir;
-	}	
+	if(#dir) frmTab2.edt_remote.text = dir;	
 }
 
-// 修改密码按钮
+// 改密
 frmTab2.btn_changePwd.oncommand = function(id,event){
-	var newPwd = frmTab2.inputBox("输入新密码（不可回撤，有需要请备份原密码）","修改密码",,"超过22个字符将作为已加密字符串存入",false);
-	selSectionName = frmTab2.cbb_sections.selText;
-	RcloneChangePassword(selSectionName,"password",newPwd);
-	ReadConfig(selSectionName);
-}
-// 修改盐按钮
-frmTab2.btn_changeSalt.oncommand = function(id,event){
-	var newSalt = frmTab2.inputBox("输入新的盐（非必须！不可回撤，有需要请备份原盐）","修改加盐密码",,"超过22个字符将作为已加密字符串存入",false);
-	selSectionName = frmTab2.cbb_sections.selText;
-	RcloneChangePassword(selSectionName,"password2",newSalt);
-	ReadConfig(selSectionName);
-}
-
-// 添加小节/库的按钮
-// 添加SECTION后，复用原有控件，然后点保存按钮以string存入
-frmTab2.btn_addSection.oncommand = function(id,event){
-	var addNewSection_Name = frmTab2.inputBox("输入要新添加的库名/SECTION，也是rclone的remote名","添加新的库/SECTION/REMOTE",,
-												"不能_开头和空格结尾，只能使用英文字母、数字和下划线");
-/*	使用rclone config create/update 重写											
-	if(#addNewSection_Name){
-		var addASection =string.join(['\r\n',"["+addNewSection_Name+"]","type = crypt"],'\r\n');
-		string.save(..rcConfig_FullPath,addASection,true);
-		ReloadSectionList(addNewSection_Name);
-		ReadConfig(addNewSection_Name);
-		ChangeEditControllerDisabledTo(false,true);
-		frmTab2.edt_suffix.text = ".rcc";
-		frmTab2.cbb_fileNameEncrypt.items = {"off","standard","obfuscate"};
-		frmTab2.cbb_dirNameEncrypt.items = {"false","true"};
-		frmTab2.cbb_fileNameEncrypt.selIndex = 1;
-		frmTab2.cbb_dirNameEncrypt.selIndex = 1;
-		frmTab2.btn_editConfig.text = "取消编辑";
-		isEdtingConfig = 1;
-		isAddingNewSection = 1;
-	}
-*/
+	var newPwd = frmTab2.inputBox("输入新密码","修改密码",,"超过22字符存为已加密串", false);
+	if(!newPwd) return;
 	
-	if(#addNewSection_Name){
-		addNewSection_Name,errorTip = SectionValidateInput(addNewSection_Name);
-		if(#errorTip){
-			frmTab2.msgboxErr(errorTip);
-		}
-		isEdtingConfig = 1;
-		isAddingNewSection = 1;
-		var prcs = process.popen(..rclone_Path,"config","create",addNewSection_Name,"crypt");
-		var stdOut,stdErr = prcs.readAll();
-		if(#stdErr){
-			frmTab2.msgboxErr(stdErr,"输入有误，参考rclone返回");
-			return 0;
-		}
-		ReloadSectionList(addNewSection_Name);
-		ReadConfig(addNewSection_Name);
-		ChangeEditControllerDisabledTo(false,true);
-		frmTab2.edt_suffix.text = ".rcc";
-		frmTab2.cbb_fileNameEncrypt.items = {"off","standard","obfuscate"};
-		frmTab2.cbb_dirNameEncrypt.items = {"false","true"};
-		frmTab2.cbb_fileNameEncrypt.selIndex = 1;
-		frmTab2.cbb_dirNameEncrypt.selIndex = 1;
-		frmTab2.btn_editConfig.text = "取消编辑";
+	// 1. 【暂存】如果正在编辑，先保存当前 UI 上的值
+	var uiSnapshot = null;
+	if(isEdtingConfig){
+		uiSnapshot = GetUiState();
 	}
-
+	
+	var selSectionName = frmTab2.cbb_sections.selText;
+	if(RcloneChangePassword(selSectionName, "password", newPwd)){
+		RefreshGlobalConfig(); // 刷新文件到内存
+		ReadConfig(selSectionName); // 刷新内存到 UI (会覆盖未保存的更改)
+		
+		// 2. 【恢复】如果之前处于编辑状态，将暂存的值填回去
+		if(isEdtingConfig && uiSnapshot){
+			RestoreUiState(uiSnapshot);
+		}
+		
+		//frmTab2.msgbox("密码修改成功！");
+	}
 }
 
-// 删除当前小节
+// 改盐
+frmTab2.btn_changeSalt.oncommand = function(id,event){
+	var newSalt = frmTab2.inputBox("输入新盐","修改加盐密码",,"超过22字符存为已加密串", false);
+	if(!newSalt) return;
+	
+	// 1. 【暂存】
+	var uiSnapshot = null;
+	if(isEdtingConfig){
+		uiSnapshot = GetUiState();
+	}
+	
+	var selSectionName = frmTab2.cbb_sections.selText;
+	if(RcloneChangePassword(selSectionName, "password2", newSalt)){
+		RefreshGlobalConfig();
+		ReadConfig(selSectionName);
+		
+		// 2. 【恢复】
+		if(isEdtingConfig && uiSnapshot){
+			RestoreUiState(uiSnapshot);
+		}
+		
+		//frmTab2.msgbox("盐修改成功！");
+	}
+}
+
+// 添加库
+frmTab2.btn_addSection.oncommand = function(id,event){
+	var addNewSection_Name = frmTab2.inputBox("输入新库名(Remote Name)","添加库",,
+												"只能使用英文字母、数字和下划线");
+	if(!#addNewSection_Name) return;
+
+	var errorTip;
+	addNewSection_Name, errorTip = SectionValidateInput(addNewSection_Name);
+	if(#errorTip) {
+		frmTab2.msgboxErr(errorTip);
+		// 继续执行还是返回？通常如果有错应该返回，这里假设用户想继续尝试或者您想让他修
+		// 如果要强制正确：return;
+	}
+	
+	isEdtingConfig = 1;
+	isAddingNewSection = 1;
+	
+	// 使用 Rclone 创建空 crypt
+	var prcs = process.popen(..rclone_Path, "config", "create", addNewSection_Name, "crypt");
+	var stdOut, stdErr = prcs.readAll();
+	
+	if(#stdErr){
+		frmTab2.msgboxErr(stdErr, "创建失败");
+		return;
+	}
+	
+	// 刷新并选中新库
+	ReloadSectionList(addNewSection_Name);
+	ReadConfig(addNewSection_Name);
+	
+	// 进入编辑模式
+	ChangeEditControllerDisabledTo(false, true);
+	frmTab2.edt_suffix.text = ".rcc";
+	frmTab2.cbb_fileNameEncrypt.selIndex = 2; // standard
+	frmTab2.cbb_dirNameEncrypt.selIndex = 2; // true
+	frmTab2.btn_editConfig.text = "取消编辑";
+}
+
+// 删除库
 frmTab2.btn_delSection.oncommand = function(id,event){
-	selSectionName = frmTab2.cbb_sections.selText; 
-	var cfm = frmTab2.msgboxTest("确认删除["+selSectionName+"]?","确认删除当前库/SECTION？");
+	var selSectionName = frmTab2.cbb_sections.selText; 
+	if(!#selSectionName) return;
+	
+	var cfm = frmTab2.msgboxTest("确认删除 [" ++ selSectionName ++ "] ?","确认删除");
 	if(cfm){
-		..rcCfg.write(selSectionName,null);
-		var nss = ReloadSectionList(,-1);
-		ReadConfig(nss);
+		// 删除配置
+		..rcCfg.write(selSectionName, null);
+		// 刷新，参数2为 -1 表示选中最后一个
+		var newSel = ReloadSectionList(null, -1);
+		ReadConfig(newSel);
 	}
 }
 
-// 打开配置文件的按钮
+// 打开配置文件
 frmTab2.btn_openConfigFile.oncommand = function(id,event){
 	if(!io.exist(..rcConfig_FullPath)){
-		frmTab2.msgboxErr("配置文件不存在或打开失败:" + ..rcConfig_FullPath,"错误");
-		return false;
+		frmTab2.msgboxErr("文件不存在: " ++ ..rcConfig_FullPath);
+		return;
 	}
-	process.execute("notepad.exe", ..rcConfig_FullPath); 
+	process.execute("notepad.exe", ..rcConfig_FullPath);
 }
 
-// 编辑配置按钮
+// 编辑/取消编辑
 frmTab2.btn_editConfig.oncommand = function(id,event){
 	if(isEdtingConfig == 0){
 		ChangeEditControllerDisabledTo(false);
@@ -187,199 +392,57 @@ frmTab2.btn_editConfig.oncommand = function(id,event){
 		ChangeEditControllerDisabledTo(true);
 		frmTab2.btn_editConfig.text = "修改配置";
 		isEdtingConfig = 0;
+		// 取消编辑，重读还原
 		ReadConfig(frmTab2.cbb_sections.selText);
 	}	
 }
 
-// 重新读取配置按钮
+// 重新读取
 frmTab2.btn_reload.oncommand = function(id,event){
-	var old_cbb_sections_Seltext = frmTab2.cbb_sections.selText;
-	var newSelSecName = ReloadSectionList(old_cbb_sections_Seltext);
-	ReadConfig(newSelSecName);
+	var oldSel = frmTab2.cbb_sections.selText;
+	var newSel = ReloadSectionList(oldSel);
+	ReadConfig(newSel);
 }
 
-// 保存修改或新增的配置的按钮
+// 保存配置
 frmTab2.btn_saveConfig.oncommand = function(id,event){
-	selSectionName = frmTab2.cbb_sections.selText;
-	selSection = ..rcCfg.getSection(selSectionName); 
+	var selSectionName = frmTab2.cbb_sections.selText;
+	if(!#selSectionName) return;
+	
+	var selSection = ..rcCfg.getSection(selSectionName); 
+	if(!selSection) return;
+
 	selSection.remote = frmTab2.edt_remote.text;
 	selSection.filename_encryption = frmTab2.cbb_fileNameEncrypt.selText;
 	selSection.directory_name_encryption = frmTab2.cbb_dirNameEncrypt.selText;
 	selSection.suffix = frmTab2.edt_suffix.text;
-	//selSection.password = frmTab2.edt_password.text;
-	//selSection.password2 = frmTab2.edt_password2.text;
-	selSection.save();
+	
+	selSection.save(); // 保存到文件
+
+	// 如果是新增模式，需要单独处理密码
 	if(isAddingNewSection == 1) {
-		var addNewSection_password = frmTab2.edt_password.text;
-		var addNewSection_password2 = frmTab2.edt_password2.text;
-		RcloneChangePassword(selSectionName,"password",addNewSection_password);
-		RcloneChangePassword(selSectionName,"password2",addNewSection_password2);
+		var pwd = frmTab2.edt_password.text;
+		var pwd2 = frmTab2.edt_password2.text;
+		if(#pwd) RcloneChangePassword(selSectionName, "password", pwd);
+		if(#pwd2) RcloneChangePassword(selSectionName, "password2", pwd2);
 		isAddingNewSection = 0;
+		
+		// 密码修改会改变文件，必须刷新
+		RefreshGlobalConfig();
 	}
+	
 	isEdtingConfig = 0;
 	frmTab2.btn_editConfig.text = "编辑配置";
 	ChangeEditControllerDisabledTo(true);
+	
+	// 保存后刷新一次界面
+	ReloadSectionList(selSectionName);
 	ReadConfig(selSectionName);
+	//frmTab2.msgbox("配置已保存");
 }
 
-
-// 调用Rclone config update 来修改password/password2的值
-// section:指定小节; key:password/password2; newPwd:新的密码
-RcloneChangePassword = function(section,key,newPwd,both=0,...){
-	var selSectionName = section;
-	key = string.lower(key);
-	if(key != "password" and key != "password2"){
-		var errCode = 0;
-		var err = "key 只能是 password 或 password2";
-		return errCode,err; 
-	} else{
-		if(#newPwd == 0){
-			return;
-		} elseif(#newPwd <= 22){
-			var prcs = process.popen(..rclone_Path,"config","update",selSectionName,key+"="+newPwd,"--obscure");
-			var stdOut,stdErr = prcs.readAll();
-			if(#stdErr){
-				frmTab2.msgboxErr(stdErr,"输入有误，参考rclone返回");
-				return 0;
-			}
-		} else{
-			var prcs = process.popen(..rclone_Path,"config","update",selSectionName,key+"="+newPwd,"--no-obscure");
-			var stdOut,stdErr = prcs.readAll();
-			if(#stdErr){
-				frmTab2.msgboxErr(stdErr,"输入有误，参考rclone返回");
-				return 0;
-			}
-		}
-		var errCode = 1;
-		return errCode; 	
-	}
-}
-
-//函数 控制库信息显示控件的禁用属性是否开启，不包含两个密码Edit
-// false:启用控件 ； true:禁用控件 
-// originalPwd 控制密码相关控件，是否在输入框输入原始密码，默认为0。若为true时启用密码输入框，禁用修改按钮。
-ChangeEditControllerDisabledTo = function(toStatus, originalPwd=false){
-	frmTab2.btn_changeSectionName.disabled = toStatus;
-	frmTab2.btn_remoteDirDlg.disabled = toStatus;
-	frmTab2.edt_remote.readonly = toStatus;
-	frmTab2.cbb_fileNameEncrypt.disabled = toStatus;
-	frmTab2.cbb_dirNameEncrypt.disabled = toStatus;
-	frmTab2.edt_suffix.readonly = toStatus;	
-	frmTab2.btn_saveConfig.disabled = toStatus;
-	//frmTab2.btn_delSection.disabled = toStatus;
-	if(originalPwd == true){
-		frmTab2.btn_changeSalt.disabled = true;
-		frmTab2.btn_changePwd.disabled = true;
-
-	} else{
-		frmTab2.btn_changeSalt.disabled = toStatus;
-		frmTab2.btn_changePwd.disabled = toStatus;
-	}	
-	frmTab2.edt_password.readonly = !originalPwd;
-	frmTab2.edt_password2.readonly = !originalPwd;
-}
-
-// 读取对应小节名的配置信息
-ReadConfig = function(section){
-	if(io.getSize(..rcConfig_FullPath)==0){
-		frmTab2.msgboxErr("配置文件为空，请新建库");
-	} elseif(table.find(..sectionNames,section)){
-		selSection = ..rcCfg.getSection(section);
-		frmTab2.edt_type.text = selSection.type;
-		frmTab2.edt_remote.text = selSection.remote;
-		frmTab2.edt_password.text = selSection.password;
-		frmTab2.edt_password2.text = selSection.password2;
-		frmTab2.edt_suffix.text = selSection.suffix;
-		try{	
-			lower_selSection_filename_encryption = string.lower(selSection.filename_encryption);
-			lower_selSection_directory_name_encryption = string.lower(selSection.directory_name_encryption);	
-		}
-		// filename_encryption 文件名加密值的combobox显示
-		if(!#selSection.filename_encryption){
-			frmTab2.cbb_fileNameEncrypt.clear();
-		} elseif(lower_selSection_filename_encryption != "off" and 
-				lower_selSection_filename_encryption != "standard" and 
-				lower_selSection_filename_encryption != "obfuscate"){
-			if(frmTab2.cbb_fileNameEncrypt.count == 3){
-				//frmTab2.cbb_fileNameEncrypt.clear();
-				var tip = selSection.filename_encryption ++ " 是错误的值! ";
-				frmTab2.cbb_fileNameEncrypt.add(tip);
-				frmTab2.cbb_fileNameEncrypt.selIndex = 4;
-			} else {
-				frmTab2.cbb_fileNameEncrypt.items = {"off","standard","obfuscate"};
-				var tip = selSection.filename_encryption ++ " 是错误的值! ";
-				frmTab2.cbb_fileNameEncrypt.add(tip);
-				frmTab2.cbb_fileNameEncrypt.selIndex = 4;
-			}
-		} else{
-		//elseif(frmTab2.cbb_fileNameEncrypt.count == 0 or frmTab2.cbb_fileNameEncrypt.count != 3){
-			frmTab2.cbb_fileNameEncrypt.items = {"off","standard","obfuscate"};
-			frmTab2.cbb_fileNameEncrypt.selText = lower_selSection_filename_encryption;
-		}
-		// directory_name_encryption目录加密值的combobox显示
-		if(!#selSection.directory_name_encryption){
-			frmTab2.cbb_dirNameEncrypt.clear();
-		} elseif(lower_selSection_directory_name_encryption != "false" and 
-				lower_selSection_directory_name_encryption != "true"){
-			if(frmTab2.cbb_dirNameEncrypt.count == 2){
-				//frmTab2.cbb_dirNameEncrypt.clear();
-				var tip = selSection.directory_name_encryption ++ " 是错误的值! ";
-				frmTab2.cbb_dirNameEncrypt.add(tip);
-				frmTab2.cbb_dirNameEncrypt.selIndex = 3;
-			} else {
-				frmTab2.cbb_dirNameEncrypt.items = {"false","true"};
-				var tip = selSection.directory_name_encryption ++ " 是错误的值! ";
-				frmTab2.cbb_dirNameEncrypt.add(tip);
-				frmTab2.cbb_dirNameEncrypt.selIndex = 3;
-			}
-		} else{
-		//elseif(frmTab2.cbb_dirNameEncrypt.count == 0 or frmTab2.cbb_fileNameEncrypt.count != 2){
-			frmTab2.cbb_dirNameEncrypt.items = {"false","true"};
-			frmTab2.cbb_dirNameEncrypt.selText = lower_selSection_directory_name_encryption;
-		}	
-	} else{
-		frmTab2.msgboxErr("没有找到对应库的信息，请重新读取配置文件");
-	}
-}
-
-// 重新读取小节名到comboboxlist里，如果指定参数，则读取后指向参数
-// 两个参数传一个即可，若都传，则先指定Index，后尝试SelText
-ReloadSectionList = function(newSelText,newIndex=1){
-	..rcCfg = null;
-	..rcCfg = fsys.ini(..rcConfig_Path);
-	..sectionNames = ..rcCfg.getSectionNames();
-	ReloadTabSectionList(..sectionNames);
-	if(newIndex == -1){ //Index=-1指定列表最后一个
-		newIndex = #..sectionNames;
-	}
-	frmTab2.cbb_sections.selIndex = newIndex;
-	if(#newSelText){
-		frmTab2.cbb_sections.selText = newSelText;
-	}
-	var newSSName = frmTab2.cbb_sections.selText;
-	var countSNames = #..sectionNames;
-	return newSSName,countSNames; 
-}
-
-// 自定义公共校验函数，使用隐式传递的 owner 参数获取当前触发事件的控件
-SectionValidateInput = function(text){	
-	var errorTip;
-    if(string.left(text,1)=="_"){
-        text = string.trimleft(text,"_");
-        errorTip= "不能以下划线_开头";
-    }
-    // 使用模式匹配检查是否只包含数字、字母或下划线
-    if(!string.match(text, "^[\w]+$")) {
-        // 清除非法字符
-        text = string.replace(text, "[^\w]", "");
-        errorTip=errorTip + '\n' + "只能输入数字、字母或下划线";
-    }
-    if(#errorTip){
-    	errorTip = errorTip + '\n' + "实际存入的库名为：" + text;
-    }
-    text = string.trim(text);
-    return text,errorTip; 
-}
+// 【关键步骤】：将内部函数暴露给 frmTab2 对象，供 Main 调用
+frmTab2.ReadConfig = ReadConfig;
 
 frmTab2.show();
 win.loopMessage();

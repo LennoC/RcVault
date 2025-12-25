@@ -1,5 +1,4 @@
 import win.ui;
-
 /*DSG{{*/
 mainForm = win.form(text="RcVault";right=439;bottom=539;max=false)
 mainForm.add(
@@ -66,7 +65,7 @@ ReloadTabSectionList = function(sectionList,selText){
 
 mainForm.tab.onSelChange = function(index){
 	if(index == 2 && lastActiveTab != 2){
-        ReadConfig(frmTab2.cbb_sections.selText);
+        frmTab2.ReadConfig(frmTab2.cbb_sections.selText);
     }
     lastActiveTab = index;
 }
