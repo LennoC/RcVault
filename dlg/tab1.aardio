@@ -5,7 +5,6 @@ import string;
 import fsys.ini;
 import fsys;
 import fonts.fontAwesome;
-
 /*DSG{{*/
 var frmTab1 = win.form(text="挂载";right=399;bottom=499;max=false)
 frmTab1.add(
@@ -34,6 +33,12 @@ static7={cls="static";text="用户名：";left=24;top=256;right=128;bottom=288;d
 
 var isMounted = 0 //是否挂载
 var isNetMounted = 0; //是否网络映射
+var currentPrcsId = 0;   // 存储挂载 PID
+var currentNetPrcsId = 0;// 存储映射 PID
+var prcs = null;         // 挂载进程对象
+var netPrcs = null;      // 映射进程对象
+var vaultName_Mounted = "";
+var vaultName_NetMounted = "";
 
 if(frmTab1.cbb_sections.count==0){
 	frmTab1.cbb_sections.addItems(..sectionNames);
@@ -49,15 +54,32 @@ frmTab1.btn_mount.oncommand = function(id,event){
 	var ds_cmd = ds + ":";
 	if(isMounted==0 and fsys.path.isDir(ds_cmd)){
 		frmTab1.msgboxErr("已存在该分区，请更换其他分区");
-		return ; }
+		return false; 
+		}
 	if(isMounted==0){
 		vaultName_Mounted = vaultName;
 		var vaultName_cmd = vaultName + ":";
 		var t1 = "将库 " ++ vaultName ++ " 挂载在" ++ ds ++ "盘";
-		prcs_cmd = process.joinArguments(..rclone_Path,"mount",vaultName_cmd,ds_cmd,"--vfs-cache-mode","full","--dir-cache-time","60s","--links"); // dir-cache-time defualt 5min
-		prcs = process.popen(..rclone_Path,"mount",vaultName_cmd,ds_cmd,"--vfs-cache-mode","full","--dir-cache-time","60s","--links");
-		TextLog("程序执行命令为： "+prcs_cmd);
+		// 用数组传参，由 aardio 自动处理空格和引号
+		// dir-cache-time defualt 5min
+		var args = {
+        	"mount"; vaultName_cmd; ds_cmd;
+        	"--vfs-cache-mode"; "full";
+        	"--dir-cache-time"; "60s";
+        	"--links"
+    	};
+		prcs_cmd = process.joinArguments(..rclone_Path,args); 
+		prcs = process.popen(..rclone_Path,args);
+		if(!prcs){
+        	TextLog("错误: 无法启动 Rclone 进程");
+        	return;
+    	}
+		prcs.codepage = 65001; // 关键步骤：强制指定进程输出编码为 UTF-8 (65001)
+		prcs.killOnExit(); // 确保主程序退出时，挂载也强制卸载
+    	currentPrcsId = prcs.process.id; // 记录下这个进程的 PID，用于后续精确关闭
+		TextLog("程序执行命令为： " + prcs_cmd);
 		TextLog(t1);
+		TextLog("本地挂载进程PID为：" + tostring(currentPrcsId));
 		prcs.logResponse(frmTab1.edt_LogShow);
 		frmTab1.btn_mount.text = "停止";
 		for(i=1;3;1){
@@ -72,17 +94,37 @@ frmTab1.btn_mount.oncommand = function(id,event){
 		}
 
 	}
-	elseif(isMounted==1){
-		try{
-			if(prcs){
-			prcs.terminate(); }
-		}
-		frmTab1.btn_mount.text = "挂载";
-		//frmTab1.cbb_sections.disabled = false;
-		frmTab1.cbb_driveList.disabled = false;
-		frmTab1.btn_openMountPath.disabled = true;
-		isMounted = 0;	
-		TextLog("已停止库 " ++ vaultName_Mounted ++ " 的本地挂载");	
+	elseif(isMounted == 1){
+    	frmTab1.btn_mount.disabledText = "停止中";
+    	
+    	// 1. 优先尝试正常卸载逻辑 (Windows 下推荐使用 taskkill 发送关闭信号而非直接 terminate)
+    	if(prcs){
+        	killProcessById(currentPrcsId);
+        	// 给一点缓冲时间让系统回收盘符
+        	for(i=1;10;1){
+            	thread.delay(300);
+            	if(!fsys.path.isDir(ds_cmd)) break; // 检查盘符是否已消失
+           		if(i == 10 && prcs) prcs.terminate(); // 如果 3秒后还没卸载，尝试对象级别的终结
+        	}
+    	}
+    	
+    	// 2. 二次检查：如果盘符依然残留，尝试强力清除
+    	if(fsys.path.isDir(ds_cmd)){
+        	// 强制结束进程对象
+        	if(prcs) prcs.terminate();
+        	// 针对 WinFsp 的残留，有时需要重启资源管理器或手动卸载（可选高级操作）
+        	TextLog("警告：盘符卸载缓慢，请检查资源管理器。必要时重启资源管理器。");
+    	}
+	
+    	// 3. 重置 UI 状态
+    	frmTab1.btn_mount.disabledText = null;
+    	frmTab1.cbb_driveList.disabled = false;
+    	frmTab1.btn_openMountPath.disabled = true;
+    	isMounted = 0;
+    	prcs = null; // 释放对象
+    	TextLog("已停止库 " ++ vaultName_Mounted ++ " 的本地挂载");
+    	TextLog("-------------------------------------------");
+    	frmTab1.btn_mount.text = "挂载";
 	}
 }
 
@@ -109,33 +151,41 @@ frmTab1.btn_netMount.oncommand = function(id,event){
 	var t3 = "通过支持协议 " ++ nm_serverType ++ " 的浏览器或管理器访问 127.0.0.1:" ++ nm_serverPort ++ " 以查看映射后的加密库";
 	if(isNetMounted == 1){
 		try{
+			if(currentNetPrcsId && currentNetPrcsId != 0){
+     			killProcessById(currentNetPrcsId);
+			}
 			if(netPrcs){
 				netPrcs.terminate();
 			}
 		}
 		isNetMounted = 0;
+		netPrcs = null;
 		frmTab1.btn_netMount.text = "映射";
 		frmTab1.cbb_serverType.disabled = false;
 		frmTab1.cbb_serverPort.disabled = false;
 		frmTab1.edt_serverUser.readonly = false;
 		frmTab1.edt_serverPwd.readonly = false;
 		TextLog("已停止库 " ++ vaultName_NetMounted ++ " 的网络映射");	
+		TextLog("-------------------------------------------");
 			
 	}
 	elseif(isNetMounted == 0){
-		if(nm_serverUser==""){
-			netPrcs_cmd = process.joinArguments(..rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort);
-			netPrcs,netPrcsErr = process.popen(..rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort);
-		}
-		else{
-			netPrcs_cmd = process.joinArguments(..rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort,"--user",nm_serverUser,"--pass",nm_serverPwd);
-			netPrcs,netPrcsErr = process.popen(..rclone_Path,"serve",nm_serverType,vaultName_cmd,"--addr","0.0.0.0:"+nm_serverPort,"--user",nm_serverUser,"--pass",nm_serverPwd);
-		}
+		var args = {"serve"; nm_serverType; vaultName_cmd; "--addr"; "0.0.0.0:" + nm_serverPort};
+    	if(#nm_serverUser){
+    		table.push(args, "--user", nm_serverUser, "--pass", nm_serverPwd);
+    	}
+		netPrcs_cmd = process.joinArguments(..rclone_Path,args);
+		netPrcs,netPrcsErr = process.popen(..rclone_Path,args);
 		if(!netPrcs) { 
-			return winform.msgboxErr(netPrcsErr); 
+			TextLog("错误: 网络服务映射失败 或 无法启动 Rclone 进程");
+			TextLog("-------------------------------------------");
+			return frmTab1.msgboxErr(netPrcsErr); 
 		}
 		else{
-			TextLog("程序执行命令为： "+netPrcs_cmd);
+			currentNetPrcsId = netPrcs.process.id;
+			netPrcs.killOnExit(); // 确保主程序退出时，挂载也强制卸载
+			netPrcs.codepage = 65001; // 关键步骤：强制指定进程输出编码为 UTF-8 (65001)
+			TextLog("程序执行命令为： " + netPrcs_cmd);
 			isNetMounted = 1;
 			vaultName_NetMounted = vaultName;
 			frmTab1.btn_netMount.text = "停止";
@@ -146,14 +196,15 @@ frmTab1.btn_netMount.oncommand = function(id,event){
 			TextLog(t1);
 			TextLog(t2);
 			TextLog(t3);
+			TextLog("网络映射进程PID为：" + tostring(currentNetPrcsId));
 			netPrcs.logResponse(frmTab1.edt_LogShow);
-			netPrcs.killOnExit();
 		}
 	}
 }
 
 TextLog = function(text){
-	frmTab1.edt_LogShow.appendText(NowTime() + tostring(text) + '\r\n');
+	frmTab1.edt_LogShow.appendText("[ " ++ NowTime() ++ "] " ++ tostring(text) ++ '\r\n');
+	frmTab1.edt_LogShow.scrollCaret();
 }
 
 NowTime = function(){
@@ -161,34 +212,45 @@ NowTime = function(){
 	return tm;
 }
 
-frmTab1.onClose = function(hwnd,message,wParam,lParam){
-	try{
-		if(netPrcs){
-			netPrcs.terminate();
-		}
-		if(prcs){
-			prcs.terminate();
-		}
-	}
+// 静默结束进程（精确 PID 模式）
+killProcessById = function(pid){
+    if(!pid) return;
+    // 使用隐藏模式执行 taskkill，避免黑框
+    process.execute("taskkill", string.format("/F /T /PID %d", pid), 0); 
 }
 
+// 辅助功能：显示/隐藏密码
 frmTab1.btn_showPwd.oncommand = function(id,event){
 	if(frmTab1.edt_serverPwd.passwordChar){
-	frmTab1.edt_serverPwd.passwordChar = null;
-	frmTab1.btn_showPwd.text = '\uF070'; //"隐"
+		frmTab1.edt_serverPwd.passwordChar = null;
+		frmTab1.btn_showPwd.text = '\uF070'; //"隐"
 	}
 	else{
-	frmTab1.edt_serverPwd.passwordChar = "*";
-	frmTab1.btn_showPwd.text = '\uF06E' ; //"显"
+		frmTab1.edt_serverPwd.passwordChar = "*";
+		frmTab1.btn_showPwd.text = '\uF06E' ; //"显"
 	}
 }
 
+// 辅助功能：打开盘符
 frmTab1.btn_openMountPath.oncommand = function(id,event){
 	var ds = frmTab1.cbb_driveList.selText ++ ":";
-	process.execute("explorer", ds);  
+	if(fsys.path.isDir(ds)){
+        process.execute("explorer.exe", ds);
+    }
 }
 
-
+// 窗口关闭前的最终清理
+frmTab1.onClose = function(hwnd,message,wParam,lParam){
+	try{
+		if(currentPrcsId && currentPrcsId != 0 ) killProcessById(currentPrcsId);
+        if(currentNetPrcsId && currentNetPrcsId != 0 ) killProcessById(currentNetPrcsId);
+        // 给系统一点响应时间
+        thread.delay(400);
+        // 最终强行清理对象
+        if(prcs) prcs.terminate();
+        if(netPrcs) netPrcs.terminate();
+	}
+}
 
 frmTab1.show();
 win.loopMessage();
