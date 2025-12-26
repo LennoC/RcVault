@@ -61,11 +61,15 @@ frmTab1.btn_mount.oncommand = function(id,event){
 		var vaultName_cmd = vaultName + ":";
 		var t1 = "将库 " ++ vaultName ++ " 挂载在" ++ ds ++ "盘";
 		// 用数组传参，由 aardio 自动处理空格和引号
-		// dir-cache-time defualt 5min
 		var args = {
         	"mount"; vaultName_cmd; ds_cmd;
-        	"--vfs-cache-mode"; "full";
-        	"--dir-cache-time"; "60s";
+        	"--vfs-cache-mode"; "writes";  // writes / full / off ; 仅缓存写入 / 完整读写缓存 / 不缓存
+        	"--dir-cache-time"; "60s";   // dir-cache-time defualt 5min
+        	"--vfs-cache-max-size"; "10G";
+        	"--vfs-cache-max-age";"1h";
+        	//"--cache-dir"; "D:\RcloneCache";  // 【vfs缓存目录】若有必要就切换到富余空间的目录
+        	//"--no-modtime";                  // 【可选】本地加密有时为了性能可以忽略修改时间校验
+    		//"--stats"; "0";  //增加 --stats 0 减少无效心跳日志输出
         	"--links"
     	};
 		prcs_cmd = process.joinArguments(..rclone_Path,args); 
@@ -203,7 +207,7 @@ frmTab1.btn_netMount.oncommand = function(id,event){
 }
 
 TextLog = function(text){
-	frmTab1.edt_LogShow.appendText("[ " ++ NowTime() ++ "] " ++ tostring(text) ++ '\r\n');
+	frmTab1.edt_LogShow.appendText(NowTime() ++ tostring(text) ++ '\r\n');
 	frmTab1.edt_LogShow.scrollCaret();
 }
 
@@ -216,7 +220,10 @@ NowTime = function(){
 killProcessById = function(pid){
     if(!pid) return;
     // 使用隐藏模式执行 taskkill，避免黑框
-    process.execute("taskkill", string.format("/F /T /PID %d", pid), 0); 
+    // 参数说明: 执行文件, 参数, 谓词(null), 显示命令(0为隐藏)
+    process.execute("taskkill", string.format("/F /T /PID %d", pid), null, 0);
+    // process 创建进程更静默
+    // process("taskkill", string.format("/F /T /PID %d", pid), { showWindow = 0/*_SW_HIDE*/ });
 }
 
 // 辅助功能：显示/隐藏密码
